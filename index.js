@@ -1,12 +1,15 @@
 import express from "express";
 import mysql from "mysql";
 import cors from "cors";
+import compression from "compression"; //for opt
 
 const app = express();
+const PORT = 8900;
 app.use(cors());
 // Serve static files from the 'public' directory, including the 'images' directory
+app.use(compression()); //for opt
 app.use(express.static("public"));
-app.use(express.json());
+app.use(express.json({ limit: "100mb" }));
 
 // Create a connection to the "iman" database
 //-------------------------------------------------------------------------
@@ -14,7 +17,7 @@ const db = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: "",
-  database: "test",
+  database: "master",
 });
 
 //--------------------------------------------------------------------------
@@ -487,6 +490,401 @@ app.post("/users", (req, res) => {
     }
   );
 });
+
+// Send data soil_measurements  .......................................................
+// 4 -----------------------------------------------------------------------------------
+
+db.connect((err) => {
+  if (err) {
+    console.error("Error connecting to the database:", err);
+    return;
+  }
+  console.log("Connected to the database");
+});
+
+// Endpoint to insert bulk soil data
+app.post("/bulk_soil_measurements", (req, res) => {
+  const records = req.body.map((record) => [
+    record.station_id,
+    record.soil_attribute_id,
+    record.date_time,
+    record.value,
+  ]);
+
+  const query = `
+    INSERT INTO soil_measurements (station_id, soil_attribute_id, date_time, value)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE value = VALUES(value)
+  `;
+
+  db.query(query, [records], (err, results) => {
+    if (err) {
+      console.error("Error inserting soil data:", err);
+      res.status(500).send("Server error");
+    } else {
+      res.send("Soil data inserted/updated successfully");
+    }
+  });
+});
+
+// Endpoint to insert bulk climate data
+app.post("/bulk_climate_measurements", (req, res) => {
+  const records = req.body.map((record) => [
+    record.station_id,
+    record.climate_attribute_id,
+    record.date_time,
+    record.value,
+  ]);
+
+  const query = `
+    INSERT INTO climate_measurements (station_id, climate_attribute_id, date_time, value)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE value = VALUES(value)
+  `;
+
+  db.query(query, [records], (err, results) => {
+    if (err) {
+      console.error("Error inserting climate data:", err);
+      res.status(500).send("Server error");
+    } else {
+      res.send("Climate data inserted/updated successfully");
+    }
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+// 3 -----------------------------------------------------------------------------------
+// db.connect((err) => {
+//   if (err) {
+//     console.error("Error connecting to MySQL:", err);
+//     throw err;
+//   }
+//   console.log("Connected to MySQL database");
+// });
+
+// const checkRecords = (table, attributeIdField, req, res) => {
+//   const records = req.body;
+
+//   if (!Array.isArray(records) || records.length === 0) {
+//     return res
+//       .status(400)
+//       .json({ error: "Invalid data format or empty array" });
+//   }
+
+//   const uniqueKeys = records.map(
+//     (record) => `${record[attributeIdField]}_${record.date_time}`
+//   );
+//   const placeholders = records.map(() => "(?, ?, ?)").join(", ");
+//   const values = records.flatMap((record) => [
+//     record.station_id,
+//     record[attributeIdField],
+//     record.date_time,
+//   ]);
+
+//   const query = `SELECT ${attributeIdField}, date_time FROM ${table} WHERE (station_id, ${attributeIdField}, date_time) IN (${placeholders})`;
+
+//   db.query(query, values, (err, results) => {
+//     if (err) {
+//       console.error(`Error checking existing records in ${table}:`, err);
+//       return res.status(500).json({ error: "Error checking existing records" });
+//     }
+//     const existingRecords = results.map(
+//       (result) => `${result[attributeIdField]}_${result.date_time}`
+//     );
+//     res.json({ existingRecords });
+//   });
+// };
+
+// app.post("/check_soil_records", (req, res) => {
+//   checkRecords("soil_measurements", "soil_attribute_id", req, res);
+// });
+
+// app.post("/check_climate_records", (req, res) => {
+//   checkRecords("climate_measurements", "climate_attribute_id", req, res);
+// });
+
+// app.post("/bulk_soil_measurements", (req, res) => {
+//   console.log("Received soil measurements data");
+//   const measurements = req.body;
+//   console.log(`Number of soil measurements: ${measurements.length}`);
+
+//   if (!Array.isArray(measurements) || measurements.length === 0) {
+//     console.error("Invalid data format or empty array for soil measurements");
+//     return res
+//       .status(400)
+//       .json({ error: "Invalid data format or empty array" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO soil_measurements (station_id, soil_attribute_id, date_time, value)
+//     VALUES ?`;
+
+//   const values = measurements.map(
+//     ({ station_id, soil_attribute_id, date_time, value }) => [
+//       station_id,
+//       soil_attribute_id,
+//       date_time,
+//       value,
+//     ]
+//   );
+
+//   db.query(insertQuery, [values], (err) => {
+//     if (err) {
+//       console.error("Error inserting soil measurements records:", err);
+//       return res.status(500).json({ error: "Error inserting records" });
+//     }
+//     console.log("Records inserted successfully into soil_measurements");
+//     return res.status(201).json({ message: "Records inserted successfully" });
+//   });
+// });
+
+// app.post("/bulk_climate_measurements", (req, res) => {
+//   console.log("Received climate measurements data");
+//   const measurements = req.body;
+//   console.log(`Number of climate measurements: ${measurements.length}`);
+
+//   if (!Array.isArray(measurements) || measurements.length === 0) {
+//     console.error(
+//       "Invalid data format or empty array for climate measurements"
+//     );
+//     return res
+//       .status(400)
+//       .json({ error: "Invalid data format or empty array" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO climate_measurements (station_id, climate_attribute_id, date_time, value)
+//     VALUES ?`;
+
+//   const values = measurements.map(
+//     ({ station_id, climate_attribute_id, date_time, value }) => [
+//       station_id,
+//       climate_attribute_id,
+//       date_time,
+//       value,
+//     ]
+//   );
+
+//   db.query(insertQuery, [values], (err) => {
+//     if (err) {
+//       console.error("Error inserting climate measurements records:", err);
+//       return res.status(500).json({ error: "Error inserting records" });
+//     }
+//     console.log("Records inserted successfully into climate_measurements");
+//     return res.status(201).json({ message: "Records inserted successfully" });
+//   });
+// });
+
+// const PORT = 8900;
+// app.listen(PORT, () => {
+//   console.log(`Server is running on http://localhost:${PORT}`);
+// });
+//  2 -----------------------------------------------------------------------------------
+// db.connect((err) => {
+//   if (err) {
+//     console.error("Error connecting to MySQL:", err);
+//     throw err;
+//   }
+//   console.log("Connected to MySQL database");
+// });
+
+// app.post("/bulk_soil_measurements", (req, res) => {
+//   console.log("Received soil measurements data");
+//   const measurements = req.body;
+//   console.log(`Number of soil measurements: ${measurements.length}`);
+
+//   if (!Array.isArray(measurements) || measurements.length === 0) {
+//     console.error("Invalid data format or empty array for soil measurements");
+//     return res
+//       .status(400)
+//       .json({ error: "Invalid data format or empty array" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO soil_measurements (station_id, soil_attribute_id, date_time, value)
+//     VALUES ?`;
+
+//   const values = measurements.map(
+//     ({ station_id, soil_attribute_id, date_time, value }) => [
+//       station_id,
+//       soil_attribute_id,
+//       date_time,
+//       value,
+//     ]
+//   );
+
+//   db.query(insertQuery, [values], (err) => {
+//     if (err) {
+//       console.error("Error inserting soil measurements records:", err);
+//       return res.status(500).json({ error: "Error inserting records" });
+//     }
+//     console.log("Records inserted successfully into soil_measurements");
+//     return res.status(201).json({ message: "Records inserted successfully" });
+//   });
+// });
+
+// app.post("/bulk_climate_measurements", (req, res) => {
+//   console.log("Received climate measurements data");
+//   const measurements = req.body;
+//   console.log(`Number of climate measurements: ${measurements.length}`);
+
+//   if (!Array.isArray(measurements) || measurements.length === 0) {
+//     console.error(
+//       "Invalid data format or empty array for climate measurements"
+//     );
+//     return res
+//       .status(400)
+//       .json({ error: "Invalid data format or empty array" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO climate_measurements (station_id, climate_attribute_id, date_time, value)
+//     VALUES ?`;
+
+//   const values = measurements.map(
+//     ({ station_id, climate_attribute_id, date_time, value }) => [
+//       station_id,
+//       climate_attribute_id,
+//       date_time,
+//       value,
+//     ]
+//   );
+
+//   db.query(insertQuery, [values], (err) => {
+//     if (err) {
+//       console.error("Error inserting climate measurements records:", err);
+//       return res.status(500).json({ error: "Error inserting records" });
+//     }
+//     console.log("Records inserted successfully into climate_measurements");
+//     return res.status(201).json({ message: "Records inserted successfully" });
+//   });
+// });
+
+// const PORT = 8900;
+// app.listen(PORT, () => {
+//   console.log(`Server is running on http://localhost:${PORT}`);
+// });
+
+// 1 -------------------------------------------------------
+//  app.post("/soil_measurements", (req, res) => {
+//   const { station_id, soil_attribute_id, date_time, value } = req.body;
+//   console.log("Received data:", req.body);
+
+//   const checkDuplicateQuery = `
+//     SELECT * FROM soil_measurements
+//     WHERE date_time = ? AND soil_attribute_id = ? LIMIT 1`;
+
+//   db.query(
+//     checkDuplicateQuery,
+//     [date_time, soil_attribute_id],
+//     (err, results) => {
+//       if (err) {
+//         console.error("Error checking duplicate record:", err);
+//         return res
+//           .status(500)
+//           .json({ error: "Error checking duplicate record" });
+//       }
+
+//       if (results.length > 0) {
+//         console.log("Duplicate record found, skipping insertion");
+//         return res
+//           .status(200)
+//           .json({ message: "Record already exists, skipping insertion" });
+//       } else {
+//         const insertQuery = `
+//         INSERT INTO soil_measurements (station_id, soil_attribute_id, date_time, value)
+//         VALUES (?, ?, ?, ?)`;
+
+//         db.query(
+//           insertQuery,
+//           [station_id, soil_attribute_id, date_time, value],
+//           (err) => {
+//             if (err) {
+//               console.error("Error inserting record:", err);
+//               return res.status(500).json({ error: "Error inserting record" });
+//             }
+//             console.log("Record inserted successfully");
+//             return res
+//               .status(201)
+//               .json({ message: "Record inserted successfully" });
+//           }
+//         );
+//       }
+//     }
+//   );
+// });
+
+// // Send data climate_measurements  .......................................................
+// app.post("/climate_measurements", (req, res) => {
+//   const { station_id, climate_attribute_id, date_time, value } = req.body;
+//   console.log("Received data for climate_measurements:", req.body);
+
+//   // Ensure all required fields are present
+//   if (
+//     !station_id ||
+//     !climate_attribute_id ||
+//     !date_time ||
+//     value === undefined
+//   ) {
+//     console.error("Missing required field in the request body");
+//     return res.status(400).json({ error: "Missing required field" });
+//   }
+
+//   const checkDuplicateQuery = `
+//     SELECT * FROM climate_measurements
+//     WHERE date_time = ? AND climate_attribute_id = ? LIMIT 1`;
+
+//   db.query(
+//     checkDuplicateQuery,
+//     [date_time, climate_attribute_id],
+//     (err, results) => {
+//       if (err) {
+//         console.error(
+//           "Error checking duplicate record in climate_measurements:",
+//           err
+//         );
+//         return res
+//           .status(500)
+//           .json({ error: "Error checking duplicate record" });
+//       }
+
+//       if (results.length > 0) {
+//         console.log(
+//           "Duplicate record found in climate_measurements, skipping insertion"
+//         );
+//         return res
+//           .status(200)
+//           .json({ message: "Record already exists, skipping insertion" });
+//       } else {
+//         const insertQuery = `
+//         INSERT INTO climate_measurements (station_id, climate_attribute_id, date_time, value)
+//         VALUES (?, ?, ?, ?)`;
+
+//         db.query(
+//           insertQuery,
+//           [station_id, climate_attribute_id, date_time, value],
+//           (err) => {
+//             if (err) {
+//               console.error(
+//                 "Error inserting record into climate_measurements:",
+//                 err
+//               );
+//               return res.status(500).json({ error: "Error inserting record" });
+//             }
+//             console.log(
+//               "Record inserted successfully into climate_measurements"
+//             );
+//             return res
+//               .status(201)
+//               .json({ message: "Record inserted successfully" });
+//           }
+//         );
+//       }
+//     }
+//   );
+// });
 
 // Login ---------------------------
 app.post("/login", (req, res) => {
