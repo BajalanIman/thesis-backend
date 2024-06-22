@@ -259,6 +259,19 @@ app.get("/climate_measurements", (req, res) => {
   });
 });
 
+// photos ------------------------------------------------------------------
+
+app.get("/photos", (req, res) => {
+  const q = "SELECT * FROM photos";
+  db.query(q, (err, data) => {
+    if (err) {
+      console.log(err);
+      return res.json(err);
+    }
+    return res.json(data);
+  });
+});
+
 // Send data soil_measurements  .......................................................
 
 // 4 -----------------------------------------------------------------------------------
